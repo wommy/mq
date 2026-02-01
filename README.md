@@ -205,6 +205,12 @@ This extends the mq philosophy: let agents reason over structure, but use sub-ag
 curl -fsSL https://raw.githubusercontent.com/muqsitnawaz/mq/main/install.sh | bash
 ```
 
+Or with Go (works on Windows too):
+
+```bash
+go install github.com/muqsitnawaz/mq@latest
+```
+
 ### Agent Skill
 
 Install the mq skill for Claude Code, Cursor, Codex, and other agents:
