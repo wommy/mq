@@ -6,16 +6,37 @@ Benchmarked on Apple M3 Max, Go 1.23
 
 For a single AI agent with 200k token context:
 
+### Traditional Approach (load full text)
+
 | Format | Docs per Context | Total Parse Time | Memory | Bottleneck |
 |--------|------------------|------------------|--------|------------|
-| PDF | 1-2 papers | 2-4s | ~50MB | Python subprocess |
+| PDF | 16 papers | 30s | ~800MB | Full text in context |
+| Markdown | 16 docs (50KB) | 350ms | 432MB | Full text in context |
+
+### mq Structure-First Approach
+
+| Format | Docs per Context | Total Parse Time | Memory | Bottleneck |
+|--------|------------------|------------------|--------|------------|
+| PDF | **800 PDFs** | ~25min* | ~50MB | Python subprocess |
 | Markdown | 80 docs (10KB) | 16ms | 22MB | None |
 | HTML | 40 pages | 2.3s | ~200MB | Readability extraction |
 | JSON | 800KB total | <1ms | 1MB | None |
 | JSONL | 8000 lines | <1ms | 1.2MB | None |
 | YAML | 800KB total | <1ms | 1MB | None |
 
-**Key insight**: PDF is 100x slower due to Python subprocess overhead. JSON/JSONL/YAML are near-instant.
+*PDF parsing is 1.9s each, but structure output is only ~1KB per PDF.
+
+**Key insight**: Structure-first approach enables **50x more PDFs** in context (800 vs 16) because you load ~1KB structure instead of ~50KB full text. The agent reasons over structure, then extracts only the sections it needs.
+
+### PDF Structure-First vs PageIndex
+
+| Approach | PDFs Searchable | Index Size | Cost | Build Time |
+|----------|-----------------|------------|------|------------|
+| Traditional (full text) | 16 | 50KB/PDF | $0 | - |
+| **mq** (structure-first) | **800** | 1KB/PDF | $0 | 1.9s/PDF |
+| PageIndex (LLM tree) | 266 | 3KB/PDF | $0.01-0.10/PDF | 6s/PDF |
+
+mq wins on density (800 vs 266) because local extraction produces more compact structure than LLM-generated trees.
 
 ## Markdown Parsing
 
