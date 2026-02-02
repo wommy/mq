@@ -2,6 +2,7 @@ package mq
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -362,14 +363,14 @@ func SearchDir(dirPath string, query string) (*SearchResults, error) {
 	results := &SearchResults{Query: query}
 	parser := NewParser()
 
-	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil // Skip errors
 		}
-		if info.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".md") {
+		if d.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".md") {
 			return nil
 		}
-		if strings.HasPrefix(info.Name(), ".") {
+		if strings.HasPrefix(d.Name(), ".") {
 			return nil
 		}
 

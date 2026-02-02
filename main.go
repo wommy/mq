@@ -357,62 +357,83 @@ func extractZip(archivePath, destDir string) error {
 	return nil
 }
 
+// parseMethodCall parses queries like .method("arg"), .method('arg'), or .method(arg)
+// Returns the method name, argument value (with quotes stripped), and whether parsing succeeded.
+// This handles different shell quoting behaviors across Windows CMD, PowerShell, and Unix shells.
+func parseMethodCall(query string) (method string, arg string, ok bool) {
+	if !strings.HasPrefix(query, ".") {
+		return "", "", false
+	}
+
+	// Find opening paren
+	parenIdx := strings.Index(query, "(")
+	if parenIdx == -1 {
+		// No paren, just method name like ".tree"
+		return query[1:], "", true
+	}
+
+	// Must end with closing paren
+	if !strings.HasSuffix(query, ")") {
+		return "", "", false
+	}
+
+	method = query[1:parenIdx]
+	arg = query[parenIdx+1 : len(query)-1]
+
+	// Strip quotes from arg if present (handle ", ', or no quotes)
+	if len(arg) >= 2 {
+		if (arg[0] == '"' && arg[len(arg)-1] == '"') ||
+			(arg[0] == '\'' && arg[len(arg)-1] == '\'') {
+			arg = arg[1 : len(arg)-1]
+		}
+	}
+
+	return method, arg, true
+}
+
 func handleDirectory(path string, query string) {
 	// Directory mode supports .tree and .search queries
 	if query == "" {
 		query = ".tree"
 	}
 
-	// Handle tree queries
-	if query == ".tree" || query == `.tree("compact")` {
-		result, err := mq.BuildDirTree(path, mq.TreeModeDefault)
+	method, arg, ok := parseMethodCall(query)
+	if !ok {
+		log.Fatalf("Invalid query format. Supported: .tree, .tree(\"mode\"), .search(\"term\")")
+	}
+
+	switch method {
+	case "tree":
+		mode := mq.TreeModeDefault
+		switch arg {
+		case "", "compact":
+			mode = mq.TreeModeDefault
+		case "expand", "preview":
+			mode = mq.TreeModePreview
+		case "full":
+			mode = mq.TreeModeFull
+		default:
+			log.Fatalf("Unknown tree mode: %q. Use: compact, preview, full", arg)
+		}
+		result, err := mq.BuildDirTree(path, mode)
 		if err != nil {
 			log.Fatalf("Failed to build directory tree: %v", err)
 		}
 		fmt.Print(result.String())
-		return
-	}
 
-	if query == `.tree("expand")` {
-		// expand is now an alias for preview (shows section headings)
-		result, err := mq.BuildDirTree(path, mq.TreeModePreview)
-		if err != nil {
-			log.Fatalf("Failed to build directory tree: %v", err)
+	case "search":
+		if arg == "" {
+			log.Fatalf("Search requires a term: .search(\"term\")")
 		}
-		fmt.Print(result.String())
-		return
-	}
-
-	if query == `.tree("preview")` {
-		result, err := mq.BuildDirTree(path, mq.TreeModePreview)
-		if err != nil {
-			log.Fatalf("Failed to build directory tree: %v", err)
-		}
-		fmt.Print(result.String())
-		return
-	}
-
-	if query == `.tree("full")` {
-		result, err := mq.BuildDirTree(path, mq.TreeModeFull)
-		if err != nil {
-			log.Fatalf("Failed to build directory tree: %v", err)
-		}
-		fmt.Print(result.String())
-		return
-	}
-
-	// Handle search queries: .search("term")
-	if strings.HasPrefix(query, `.search("`) && strings.HasSuffix(query, `")`) {
-		searchTerm := query[9 : len(query)-2]
-		result, err := mq.SearchDir(path, searchTerm)
+		result, err := mq.SearchDir(path, arg)
 		if err != nil {
 			log.Fatalf("Search failed: %v", err)
 		}
 		fmt.Print(result.String())
-		return
-	}
 
-	log.Fatalf("Directory mode supports: .tree, .tree(\"expand\"), .tree(\"preview\"), .tree(\"full\"), .search(\"term\")")
+	default:
+		log.Fatalf("Unknown method: .%s. Supported: .tree, .search", method)
+	}
 }
 
 func showDocumentInfo(doc *mq.Document) {

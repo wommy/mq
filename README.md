@@ -353,12 +353,28 @@ mq is built on a **Structural AST Pattern**: different formats are parsed into a
 ## Library Usage
 
 ```go
+import mq "github.com/muqsitnawaz/mq/lib"
+
+engine := mq.New()
+doc, _ := engine.LoadDocument("README.md")
+
+// Direct API
+headings := doc.GetHeadings(1, 2)       // H1 and H2 only
+section, _ := doc.GetSection("Install") // Get specific section
+code := doc.GetCodeBlocks("go")         // Go code blocks
+```
+
+For MQL string queries, use the `mql` package:
+
+```go
 import "github.com/muqsitnawaz/mq/mql"
 
 engine := mql.New()
 doc, _ := engine.LoadDocument("README.md")
 result, _ := engine.Query(doc, `.section("API") | .code("go")`)
 ```
+
+See [docs/library.md](docs/library.md) for the full API reference.
 
 ### Direct Document API
 
