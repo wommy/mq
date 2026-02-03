@@ -170,11 +170,11 @@ func (v *compilerVisitor) VisitSelector(node *SelectorNode) (interface{}, error)
 
 	case "section":
 		if len(args) == 0 {
-			return nil, fmt.Errorf("section requires a title argument")
+			return nil, fmt.Errorf("Error: .section requires a title argument\nUsage: .section(\"Section Title\")\nHint: Use .sections to get all sections")
 		}
 		title, ok := args[0].(string)
 		if !ok {
-			return nil, fmt.Errorf("section title must be a string")
+			return nil, fmt.Errorf("Error: .section requires a string title, got %T\nUsage: .section(\"Section Title\")", args[0])
 		}
 		section, found := doc.GetSection(title)
 		if !found {
@@ -233,7 +233,7 @@ func (v *compilerVisitor) VisitSelector(node *SelectorNode) (interface{}, error)
 	case "select", "filter":
 		// These are treated as filters with predicates
 		if len(node.Args) == 0 {
-			return nil, fmt.Errorf("%s requires a predicate", node.Name)
+			return nil, fmt.Errorf("Error: .%s requires a predicate\nUsage: .%s(.property == \"value\")\nExample: .headings | .filter(.level == 2)", node.Name, node.Name)
 		}
 		// Create a filter node and visit it
 		filterNode := &FilterNode{
@@ -267,24 +267,86 @@ func (v *compilerVisitor) VisitSelector(node *SelectorNode) (interface{}, error)
 
 	case "search":
 		if len(args) == 0 {
-			return nil, fmt.Errorf("search requires a query string")
+			return nil, fmt.Errorf("Error: .search requires a query string\nUsage: .search(\"query\")")
 		}
 		query, ok := args[0].(string)
 		if !ok {
-			return nil, fmt.Errorf("search query must be a string")
+			return nil, fmt.Errorf("Error: .search requires a string query, got %T\nUsage: .search(\"query\")", args[0])
 		}
 		return doc.Search(query), nil
 
 	default:
-		return nil, fmt.Errorf("unknown selector: %s", node.Name)
+		return nil, formatUnknownSelectorError(node.Name)
 	}
+}
+
+// formatUnknownSelectorError generates helpful error message for unknown selectors.
+func formatUnknownSelectorError(name string) error {
+	// Known selectors for suggestions
+	knownSelectors := []string{
+		"headings", "section", "sections", "code", "links", "images",
+		"tables", "lists", "metadata", "owner", "tags", "priority",
+		"text", "length", "tree", "search",
+	}
+
+	// Find closest match using simple string distance
+	suggestion := findClosestMatch(name, knownSelectors)
+
+	if suggestion != "" {
+		return fmt.Errorf("Error: unknown selector: .%s\nDid you mean: .%s?", name, suggestion)
+	}
+
+	return fmt.Errorf("Error: unknown selector: .%s\nAvailable selectors: .headings, .section(title), .sections, .code, .links, .images, .tables, .lists, .metadata, .owner, .tags, .priority, .text, .length, .tree, .search(query)", name)
+}
+
+// findClosestMatch finds the closest matching string using simple heuristics.
+func findClosestMatch(input string, candidates []string) string {
+	input = strings.ToLower(input)
+
+	// First check for exact prefix or suffix matches
+	for _, candidate := range candidates {
+		lower := strings.ToLower(candidate)
+		if strings.HasPrefix(lower, input) || strings.HasPrefix(input, lower) {
+			return candidate
+		}
+		if strings.HasSuffix(lower, input) || strings.HasSuffix(input, lower) {
+			return candidate
+		}
+	}
+
+	// Check for singular vs plural
+	if !strings.HasSuffix(input, "s") {
+		plural := input + "s"
+		for _, candidate := range candidates {
+			if strings.ToLower(candidate) == plural {
+				return candidate
+			}
+		}
+	} else {
+		singular := strings.TrimSuffix(input, "s")
+		for _, candidate := range candidates {
+			if strings.ToLower(candidate) == singular {
+				return candidate
+			}
+		}
+	}
+
+	// Check if any candidate contains the input or vice versa
+	for _, candidate := range candidates {
+		lower := strings.ToLower(candidate)
+		if strings.Contains(lower, input) || strings.Contains(input, lower) {
+			return candidate
+		}
+	}
+
+	return ""
 }
 
 // VisitFilter compiles a filter operation.
 func (v *compilerVisitor) VisitFilter(node *FilterNode) (interface{}, error) {
 	current := v.context.Current
 	if current == nil {
-		return nil, fmt.Errorf("no data to filter")
+		return nil, fmt.Errorf("Error: no data to filter\nHint: Use a selector before filter, e.g., .headings | .filter(.level == 2)")
 	}
 
 	// Handle different collection types
@@ -302,7 +364,7 @@ func (v *compilerVisitor) VisitFilter(node *FilterNode) (interface{}, error) {
 		return v.filterLinks(data, node.Predicate, v)
 
 	default:
-		return nil, fmt.Errorf("cannot filter type: %T", current)
+		return nil, fmt.Errorf("Error: cannot filter type: %T\nHint: filter works on collections like headings, sections, code blocks, and links", current)
 	}
 }
 
@@ -418,25 +480,25 @@ func (v *compilerVisitor) VisitFunction(node *FunctionNode) (interface{}, error)
 	switch node.Name {
 	case "map":
 		if len(node.Args) != 1 {
-			return nil, fmt.Errorf("map requires 1 argument")
+			return nil, fmt.Errorf("Error: map requires 1 argument\nUsage: .collection | map(.property)")
 		}
 		return v.mapOperation(node.Args[0])
 
 	case "contains":
 		if len(args) != 1 {
-			return nil, fmt.Errorf("contains requires 1 argument")
+			return nil, fmt.Errorf("Error: contains requires 1 argument\nUsage: .property | contains(\"substring\")")
 		}
 		return contains(v.context.Current, args[0])
 
 	case "startswith":
 		if len(args) != 1 {
-			return nil, fmt.Errorf("startswith requires 1 argument")
+			return nil, fmt.Errorf("Error: startswith requires 1 argument\nUsage: .property | startswith(\"prefix\")")
 		}
 		return startsWith(v.context.Current, args[0])
 
 	case "endswith":
 		if len(args) != 1 {
-			return nil, fmt.Errorf("endswith requires 1 argument")
+			return nil, fmt.Errorf("Error: endswith requires 1 argument\nUsage: .property | endswith(\"suffix\")")
 		}
 		return endsWith(v.context.Current, args[0])
 
@@ -444,8 +506,20 @@ func (v *compilerVisitor) VisitFunction(node *FunctionNode) (interface{}, error)
 		return getLength(v.context.Current), nil
 
 	default:
-		return nil, fmt.Errorf("unknown function: %s", node.Name)
+		return nil, formatUnknownFunctionError(node.Name)
 	}
+}
+
+// formatUnknownFunctionError generates helpful error message for unknown functions.
+func formatUnknownFunctionError(name string) error {
+	knownFunctions := []string{"map", "contains", "startswith", "endswith", "length"}
+	suggestion := findClosestMatch(name, knownFunctions)
+
+	if suggestion != "" {
+		return fmt.Errorf("Error: unknown function: %s()\nDid you mean: %s()?", name, suggestion)
+	}
+
+	return fmt.Errorf("Error: unknown function: %s()\nAvailable functions: map(), contains(), startswith(), endswith(), length()", name)
 }
 
 // VisitBinary compiles a binary operation.
@@ -493,7 +567,7 @@ func (v *compilerVisitor) VisitBinary(node *BinaryNode) (interface{}, error) {
 	case "or":
 		return toBool(left) || toBool(right), nil
 	default:
-		return nil, fmt.Errorf("unknown operator: %s", node.Operator)
+		return nil, fmt.Errorf("Error: unknown operator: %s\nSupported operators: ==, !=, <, <=, >, >=, and, or", node.Operator)
 	}
 }
 
@@ -510,7 +584,7 @@ func (v *compilerVisitor) VisitUnary(node *UnaryNode) (interface{}, error) {
 	case "-":
 		return negate(operand)
 	default:
-		return nil, fmt.Errorf("unknown unary operator: %s", node.Operator)
+		return nil, fmt.Errorf("Error: unknown unary operator: %s\nSupported operators: !, -", node.Operator)
 	}
 }
 
@@ -589,7 +663,12 @@ func getProperty(obj interface{}, name string) (interface{}, error) {
 		case "id":
 			return v.ID, nil
 		default:
-			return nil, fmt.Errorf("heading has no property: %s", name)
+			available := []string{"level", "text", "id"}
+			suggestion := findClosestMatch(name, available)
+			if suggestion != "" {
+				return nil, fmt.Errorf("Error: heading has no property: .%s\nDid you mean: .%s?\nAvailable: .level, .text, .id", name, suggestion)
+			}
+			return nil, fmt.Errorf("Error: heading has no property: .%s\nAvailable: .level, .text, .id", name)
 		}
 
 	case *mq.Section:
@@ -603,7 +682,12 @@ func getProperty(obj interface{}, name string) (interface{}, error) {
 		case "end":
 			return v.End, nil
 		default:
-			return nil, fmt.Errorf("section has no property: %s", name)
+			available := []string{"heading", "text", "start", "end"}
+			suggestion := findClosestMatch(name, available)
+			if suggestion != "" {
+				return nil, fmt.Errorf("Error: section has no property: .%s\nDid you mean: .%s?\nAvailable: .heading, .text, .start, .end", name, suggestion)
+			}
+			return nil, fmt.Errorf("Error: section has no property: .%s\nAvailable: .heading, .text, .start, .end", name)
 		}
 
 	case *mq.CodeBlock:
@@ -615,7 +699,12 @@ func getProperty(obj interface{}, name string) (interface{}, error) {
 		case "lines":
 			return v.GetLines(), nil
 		default:
-			return nil, fmt.Errorf("code block has no property: %s", name)
+			available := []string{"language", "content", "lines"}
+			suggestion := findClosestMatch(name, available)
+			if suggestion != "" {
+				return nil, fmt.Errorf("Error: code block has no property: .%s\nDid you mean: .%s?\nAvailable: .language, .content, .lines", name, suggestion)
+			}
+			return nil, fmt.Errorf("Error: code block has no property: .%s\nAvailable: .language, .content, .lines", name)
 		}
 
 	case *mq.Link:
@@ -625,11 +714,16 @@ func getProperty(obj interface{}, name string) (interface{}, error) {
 		case "url":
 			return v.URL, nil
 		default:
-			return nil, fmt.Errorf("link has no property: %s", name)
+			available := []string{"text", "url"}
+			suggestion := findClosestMatch(name, available)
+			if suggestion != "" {
+				return nil, fmt.Errorf("Error: link has no property: .%s\nDid you mean: .%s?\nAvailable: .text, .url", name, suggestion)
+			}
+			return nil, fmt.Errorf("Error: link has no property: .%s\nAvailable: .text, .url", name)
 		}
 
 	default:
-		return nil, fmt.Errorf("cannot access property %s on type %T", name, obj)
+		return nil, fmt.Errorf("Error: cannot access property .%s on type %T", name, obj)
 	}
 }
 
@@ -715,7 +809,7 @@ func lessThan(a, b interface{}) (bool, error) {
 		}
 	}
 
-	return false, fmt.Errorf("cannot compare %T and %T", a, b)
+	return false, fmt.Errorf("Error: cannot compare %T and %T\nHint: comparison operators work with numbers or strings", a, b)
 }
 
 // toNumber converts various numeric types to float64 for comparison
@@ -766,7 +860,7 @@ func negate(v interface{}) (interface{}, error) {
 	case float64:
 		return -val, nil
 	default:
-		return nil, fmt.Errorf("cannot negate %T", v)
+		return nil, fmt.Errorf("Error: cannot negate %T\nHint: negation (-) only works with numbers", v)
 	}
 }
 
@@ -923,7 +1017,7 @@ func (v *compilerVisitor) handlePropertyAccess(property string) (interface{}, bo
 func (v *compilerVisitor) mapOperation(transform QueryNode) (interface{}, error) {
 	current := v.context.Current
 	if current == nil {
-		return nil, fmt.Errorf("no data to map")
+		return nil, fmt.Errorf("Error: no data to map\nHint: Use a selector before map, e.g., .sections | map(.text)")
 	}
 
 	// Handle different collection types
@@ -1018,7 +1112,7 @@ func (v *compilerVisitor) mapOperation(transform QueryNode) (interface{}, error)
 		return results, nil
 
 	default:
-		return nil, fmt.Errorf("map can only be applied to collections, got %T", current)
+		return nil, fmt.Errorf("Error: map can only be applied to collections, got %T\nHint: map works on arrays of items, e.g., .headings | map(.text)", current)
 	}
 }
 

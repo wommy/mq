@@ -272,6 +272,8 @@ mq doc.md .metadata
 
 ## Query Language
 
+mq uses a jq-inspired query syntax with piping and selectors. If you're familiar with jq, see [docs/syntax.md](docs/syntax.md) for differences and design rationale.
+
 ### Selectors
 
 | Selector | Description |

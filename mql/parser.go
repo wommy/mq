@@ -146,13 +146,19 @@ func (p *Parser) parseSelector() (QueryNode, error) {
 	case "select", "filter":
 		// These require a predicate
 		if len(args) == 0 {
-			return nil, p.error("%s requires a predicate argument", name)
+			return nil, p.errorWithHint(
+				fmt.Sprintf(".%s requires a predicate argument", name),
+				fmt.Sprintf("Usage: .%s(.property == \"value\")", name),
+			)
 		}
 		return NewFilter(args[0]), nil
 
 	case "map":
 		if len(args) == 0 {
-			return nil, p.error("map requires a transformation argument")
+			return nil, p.errorWithHint(
+				"map requires a transformation argument",
+				"Usage: .collection | map(.property)",
+			)
 		}
 		return NewFunction("map", args...), nil
 
@@ -180,7 +186,10 @@ func (p *Parser) parseFunction() (QueryNode, error) {
 	switch name {
 	case "select", "filter":
 		if len(args) == 0 {
-			return nil, p.error("%s requires a predicate argument", name)
+			return nil, p.errorWithHint(
+				fmt.Sprintf("%s requires a predicate argument", name),
+				fmt.Sprintf("Usage: %s(.property == \"value\")", name),
+			)
 		}
 		return NewFilter(args[0]), nil
 
@@ -471,4 +480,10 @@ func (p *Parser) error(format string, args ...interface{}) error {
 	token := p.current()
 	msg := fmt.Sprintf(format, args...)
 	return fmt.Errorf("parse error at line %d, column %d: %s", token.Line, token.Col, msg)
+}
+
+// errorWithHint creates a parser error with a helpful hint.
+func (p *Parser) errorWithHint(message string, hint string) error {
+	token := p.current()
+	return fmt.Errorf("parse error at line %d, column %d: %s\n%s", token.Line, token.Col, message, hint)
 }
