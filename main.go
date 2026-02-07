@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -415,7 +416,7 @@ func handleDirectory(path string, query string) {
 		default:
 			log.Fatalf("Unknown tree mode: %q. Use: compact, preview, full", arg)
 		}
-		result, err := mq.BuildDirTree(path, mode)
+		result, err := mq.BuildDirTree(context.Background(), path, mode)
 		if err != nil {
 			log.Fatalf("Failed to build directory tree: %v", err)
 		}
@@ -425,7 +426,7 @@ func handleDirectory(path string, query string) {
 		if arg == "" {
 			log.Fatalf("Search requires a term: .search(\"term\")")
 		}
-		result, err := mq.SearchDir(path, arg)
+		result, err := mq.SearchDir(context.Background(), path, arg)
 		if err != nil {
 			log.Fatalf("Search failed: %v", err)
 		}

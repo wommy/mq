@@ -1,6 +1,7 @@
 package mq
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -359,13 +360,16 @@ func (r *SearchResults) String() string {
 }
 
 // SearchDir searches all markdown files in a directory.
-func SearchDir(dirPath string, query string) (*SearchResults, error) {
+func SearchDir(ctx context.Context, dirPath string, query string) (*SearchResults, error) {
 	results := &SearchResults{Query: query}
 	parser := NewParser()
 
 	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // Skip errors
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		if d.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".md") {
 			return nil
@@ -376,7 +380,7 @@ func SearchDir(dirPath string, query string) (*SearchResults, error) {
 
 		doc, err := parser.ParseFile(path)
 		if err != nil {
-			return nil // Skip unparseable files
+			return nil
 		}
 
 		fileResults := doc.Search(query)
@@ -414,14 +418,14 @@ type DirTreeResult struct {
 }
 
 // BuildDirTree creates a tree representation of markdown files in a directory.
-func BuildDirTree(dirPath string, mode TreeMode) (*DirTreeResult, error) {
+func BuildDirTree(ctx context.Context, dirPath string, mode TreeMode) (*DirTreeResult, error) {
 	result := &DirTreeResult{
 		Path: dirPath,
 		Mode: mode,
 	}
 
 	parser := NewParser()
-	root, err := buildDirNode(dirPath, parser, mode, result)
+	root, err := buildDirNode(ctx, dirPath, parser, mode, result)
 	if err != nil {
 		return nil, err
 	}
@@ -430,8 +434,11 @@ func BuildDirTree(dirPath string, mode TreeMode) (*DirTreeResult, error) {
 	return result, nil
 }
 
-// buildDirNode recursively builds directory tree nodes.
-func buildDirNode(path string, parser *Parser, mode TreeMode, result *DirTreeResult) (*DirFileNode, error) {
+func buildDirNode(ctx context.Context, path string, parser *Parser, mode TreeMode, result *DirTreeResult) (*DirFileNode, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -519,7 +526,7 @@ func buildDirNode(path string, parser *Parser, mode TreeMode, result *DirTreeRes
 			continue
 		}
 
-		child, err := buildDirNode(childPath, parser, mode, result)
+		child, err := buildDirNode(ctx, childPath, parser, mode, result)
 		if err != nil {
 			continue // Skip entries that error
 		}
