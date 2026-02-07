@@ -349,118 +349,34 @@ func (v *compilerVisitor) VisitFilter(node *FilterNode) (interface{}, error) {
 		return nil, fmt.Errorf("Error: no data to filter\nHint: Use a selector before filter, e.g., .headings | .filter(.level == 2)")
 	}
 
-	// Handle different collection types
 	switch data := current.(type) {
 	case []*mq.Heading:
-		return v.filterHeadings(data, node.Predicate, v)
-
+		return filterCollection(data, node.Predicate, v)
 	case []*mq.Section:
-		return v.filterSections(data, node.Predicate, v)
-
+		return filterCollection(data, node.Predicate, v)
 	case []*mq.CodeBlock:
-		return v.filterCodeBlocks(data, node.Predicate, v)
-
+		return filterCollection(data, node.Predicate, v)
 	case []*mq.Link:
-		return v.filterLinks(data, node.Predicate, v)
-
+		return filterCollection(data, node.Predicate, v)
 	default:
 		return nil, fmt.Errorf("Error: cannot filter type: %T\nHint: filter works on collections like headings, sections, code blocks, and links", current)
 	}
 }
 
-// filterHeadings filters headings based on predicate.
-func (c *compilerVisitor) filterHeadings(headings []*mq.Heading, predicate QueryNode, v *compilerVisitor) ([]*mq.Heading, error) {
-	var result []*mq.Heading
-
-	for _, heading := range headings {
-		// Set current item for predicate evaluation
+func filterCollection[T any](items []T, predicate QueryNode, v *compilerVisitor) ([]T, error) {
+	var result []T
+	for _, item := range items {
 		oldCurrent := v.context.Current
-		v.context.Current = heading
-
-		// Evaluate predicate
+		v.context.Current = item
 		match, err := predicate.Accept(v)
+		v.context.Current = oldCurrent
 		if err != nil {
 			return nil, err
 		}
-
-		// Restore context
-		v.context.Current = oldCurrent
-
-		// Check if predicate matched
 		if toBool(match) {
-			result = append(result, heading)
+			result = append(result, item)
 		}
 	}
-
-	return result, nil
-}
-
-// filterSections filters sections based on predicate.
-func (c *compilerVisitor) filterSections(sections []*mq.Section, predicate QueryNode, v *compilerVisitor) ([]*mq.Section, error) {
-	var result []*mq.Section
-
-	for _, section := range sections {
-		oldCurrent := v.context.Current
-		v.context.Current = section
-
-		match, err := predicate.Accept(v)
-		if err != nil {
-			return nil, err
-		}
-
-		v.context.Current = oldCurrent
-
-		if toBool(match) {
-			result = append(result, section)
-		}
-	}
-
-	return result, nil
-}
-
-// filterCodeBlocks filters code blocks based on predicate.
-func (c *compilerVisitor) filterCodeBlocks(blocks []*mq.CodeBlock, predicate QueryNode, v *compilerVisitor) ([]*mq.CodeBlock, error) {
-	var result []*mq.CodeBlock
-
-	for _, block := range blocks {
-		oldCurrent := v.context.Current
-		v.context.Current = block
-
-		match, err := predicate.Accept(v)
-		if err != nil {
-			return nil, err
-		}
-
-		v.context.Current = oldCurrent
-
-		if toBool(match) {
-			result = append(result, block)
-		}
-	}
-
-	return result, nil
-}
-
-// filterLinks filters links based on predicate.
-func (c *compilerVisitor) filterLinks(links []*mq.Link, predicate QueryNode, v *compilerVisitor) ([]*mq.Link, error) {
-	var result []*mq.Link
-
-	for _, link := range links {
-		oldCurrent := v.context.Current
-		v.context.Current = link
-
-		match, err := predicate.Accept(v)
-		if err != nil {
-			return nil, err
-		}
-
-		v.context.Current = oldCurrent
-
-		if toBool(match) {
-			result = append(result, link)
-		}
-	}
-
 	return result, nil
 }
 
