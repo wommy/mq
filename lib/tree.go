@@ -19,6 +19,15 @@ const (
 	TreeModeFull    TreeMode = "full"    // Headings + first few words (for directories: expand + preview)
 )
 
+// FormatLineRange formats start/end line numbers for display.
+// End=0 means "extends to end of document" and displays as "start+".
+func FormatLineRange(start, end int) string {
+	if end == 0 {
+		return fmt.Sprintf("%d+", start)
+	}
+	return fmt.Sprintf("%d-%d", start, end)
+}
+
 // TreeNode represents a node in the document structure tree.
 type TreeNode struct {
 	Type     string      // "section", "code", "table", "list", "link", "image", "frontmatter"
@@ -207,8 +216,8 @@ func (t *TreeResult) renderNode(buf *strings.Builder, node *TreeNode, prefix str
 	switch node.Type {
 	case "section":
 		levelPrefix := strings.Repeat("#", node.Level)
-		buf.WriteString(fmt.Sprintf("%s%s%s %s (%d-%d)\n",
-			prefix, connector, levelPrefix, node.Text, node.Start, node.End))
+		buf.WriteString(fmt.Sprintf("%s%s%s %s (%s)\n",
+			prefix, connector, levelPrefix, node.Text, FormatLineRange(node.Start, node.End)))
 
 		// Render preview if available
 		if node.Preview != "" {
@@ -290,7 +299,7 @@ func (d *Document) Search(query string) *SearchResults {
 			results.Matches = append(results.Matches, &SearchResult{
 				File:    d.path,
 				Section: section.Heading.Text,
-				Lines:   fmt.Sprintf("%d-%d", section.Start, section.End),
+				Lines:   FormatLineRange(section.Start, section.End),
 				Match:   snippet,
 			})
 		}

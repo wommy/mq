@@ -339,3 +339,60 @@ func TestComplexQueries(t *testing.T) {
 		t.Errorf("Expected 3 unique languages, got %d", len(uniqueLangs))
 	}
 }
+
+func TestSectionLineNumbers(t *testing.T) {
+	const testDoc = `# First Section
+
+Content in first section.
+
+## Nested Section
+
+Content in nested section.
+
+# Second Section
+
+Content in second section.
+`
+
+	engine := mq.New()
+	doc, err := engine.ParseDocument([]byte(testDoc), "test.md")
+	if err != nil {
+		t.Fatalf("Failed to parse document: %v", err)
+	}
+
+	sections := doc.GetSections()
+	if len(sections) == 0 {
+		t.Fatal("Expected sections, got none")
+	}
+
+	for _, section := range sections {
+		if section.End < 0 {
+			t.Errorf("Section %q has negative End: %d", section.Heading.Text, section.End)
+		}
+		if section.Start < 0 {
+			t.Errorf("Section %q has negative Start: %d", section.Heading.Text, section.Start)
+		}
+		if section.End > 0 && section.End < section.Start {
+			t.Errorf("Section %q has End (%d) < Start (%d)", section.Heading.Text, section.End, section.Start)
+		}
+	}
+}
+
+func TestFormatLineRange(t *testing.T) {
+	tests := []struct {
+		start, end int
+		expected   string
+	}{
+		{1, 10, "1-10"},
+		{5, 20, "5-20"},
+		{1, 0, "1+"},
+		{10, 0, "10+"},
+	}
+
+	for _, tt := range tests {
+		result := mq.FormatLineRange(tt.start, tt.end)
+		if result != tt.expected {
+			t.Errorf("FormatLineRange(%d, %d) = %q, want %q", tt.start, tt.end, result, tt.expected)
+		}
+	}
+}

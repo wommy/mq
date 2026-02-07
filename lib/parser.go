@@ -129,6 +129,9 @@ func (p *Parser) buildIndexes(doc *Document) error {
 			if lines := node.Lines(); lines.Len() > 0 {
 				heading.Line = getLineNumber(lineStarts, lines.At(0).Start)
 			}
+			if heading.Line == 0 {
+				heading.Line = 1
+			}
 
 			// Add to heading indexes
 			doc.headingIndex[heading.Text] = heading
