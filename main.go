@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,7 +39,8 @@ func main() {
 			os.Exit(0)
 		case "upgrade":
 			if err := selfUpgrade(); err != nil {
-				log.Fatalf("Upgrade failed: %v", err)
+				slog.Error("Upgrade failed", "error", err)
+				os.Exit(1)
 			}
 			os.Exit(0)
 		}
@@ -62,7 +63,8 @@ func main() {
 	// Check if path is a directory
 	info, err := os.Stat(path)
 	if err != nil {
-		log.Fatalf("Failed to stat path: %v", err)
+		slog.Error("Failed to stat path", "error", err, "path", path)
+		os.Exit(1)
 	}
 
 	if info.IsDir() {
@@ -74,7 +76,8 @@ func main() {
 	engine := mql.New()
 	doc, err := engine.LoadDocument(path)
 	if err != nil {
-		log.Fatalf("Failed to load document: %v", err)
+		slog.Error("Failed to load document", "error", err, "path", path)
+		os.Exit(1)
 	}
 
 	// If no query provided, show document info
@@ -86,7 +89,8 @@ func main() {
 	// Execute the query
 	result, err := engine.Query(doc, query)
 	if err != nil {
-		log.Fatalf("Query failed: %v", err)
+		slog.Error("Query failed", "error", err, "query", query)
+		os.Exit(1)
 	}
 
 	// Display results
@@ -398,7 +402,9 @@ func handleDirectory(path string, query string) {
 
 	method, arg, ok := parseMethodCall(query)
 	if !ok {
-		log.Fatalf("Invalid query format. Supported: .tree, .tree(\"mode\"), .search(\"term\")")
+		slog.Error("Invalid query format")
+		fmt.Fprintf(os.Stderr, "Supported: .tree, .tree(\"mode\"), .search(\"term\")\n")
+		os.Exit(1)
 	}
 
 	switch method {
@@ -412,26 +418,34 @@ func handleDirectory(path string, query string) {
 		case "full":
 			mode = mq.TreeModeFull
 		default:
-			log.Fatalf("Unknown tree mode: %q. Use: compact, preview, full", arg)
+			slog.Error("Unknown tree mode", "mode", arg)
+			fmt.Fprintf(os.Stderr, "Use: compact, preview, full\n")
+			os.Exit(1)
 		}
 		result, err := mql.BuildDirTree(path, mode)
 		if err != nil {
-			log.Fatalf("Failed to build directory tree: %v", err)
+			slog.Error("Failed to build directory tree", "error", err, "path", path)
+			os.Exit(1)
 		}
 		fmt.Print(result.String())
 
 	case "search":
 		if arg == "" {
-			log.Fatalf("Search requires a term: .search(\"term\")")
+			slog.Error("Search requires a term")
+			fmt.Fprintf(os.Stderr, "Usage: .search(\"term\")\n")
+			os.Exit(1)
 		}
 		result, err := mql.SearchDir(path, arg)
 		if err != nil {
-			log.Fatalf("Search failed: %v", err)
+			slog.Error("Search failed", "error", err, "path", path)
+			os.Exit(1)
 		}
 		fmt.Print(result.String())
 
 	default:
-		log.Fatalf("Unknown method: .%s. Supported: .tree, .search", method)
+		slog.Error("Unknown method", "method", method)
+		fmt.Fprintf(os.Stderr, "Supported: .tree, .search\n")
+		os.Exit(1)
 	}
 }
 
