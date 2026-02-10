@@ -585,7 +585,7 @@ func displayResult(result interface{}) {
 
 	case *mq.Section:
 		fmt.Printf("Section: %s\n", v.Heading.Text)
-		fmt.Printf("Lines: %d-%d\n", v.Start, v.End)
+		fmt.Printf("Lines: %s\n", mq.FormatLineRange(v.Start, v.End))
 		if len(v.Children) > 0 {
 			fmt.Printf("Children: %d\n", len(v.Children))
 			for _, child := range v.Children {
@@ -596,7 +596,7 @@ func displayResult(result interface{}) {
 	case []*mq.Section:
 		fmt.Printf("Found %d sections:\n", len(v))
 		for i, s := range v {
-			fmt.Printf("%d. %s (lines %d-%d)\n", i+1, s.Heading.Text, s.Start, s.End)
+			fmt.Printf("%d. %s (lines %s)\n", i+1, s.Heading.Text, mq.FormatLineRange(s.Start, s.End))
 		}
 
 	case []*mq.CodeBlock:

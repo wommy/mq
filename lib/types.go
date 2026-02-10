@@ -33,24 +33,34 @@ type Section struct {
 	codeBlocks []*CodeBlock // Code blocks in this section (not children)
 }
 
-// GetText extracts the raw markdown content from the section using line numbers.
+// GetText extracts the raw markdown content from the section.
+// Start=0 defaults to 1 (document start), End=0 means extends to document end.
 func (s *Section) GetText() string {
-	if s.source == nil || s.Start == 0 || s.End == 0 {
+	if s.source == nil {
 		return ""
 	}
 
 	lines := strings.Split(string(s.source), "\n")
-	if s.Start > len(lines) {
+	totalLines := len(lines)
+
+	start := s.Start
+	if start == 0 {
+		start = 1
+	}
+	if start > totalLines {
 		return ""
 	}
 
 	end := s.End
-	if end > len(lines) {
-		end = len(lines)
+	if end == 0 || end > totalLines {
+		end = totalLines
 	}
 
-	// Extract lines (1-indexed to 0-indexed)
-	sectionLines := lines[s.Start-1 : end]
+	if end < start {
+		return ""
+	}
+
+	sectionLines := lines[start-1 : end]
 	return strings.Join(sectionLines, "\n")
 }
 

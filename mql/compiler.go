@@ -1247,9 +1247,14 @@ func toInt(v interface{}) (int, bool) {
 
 // buildSectionTree builds a tree result for a single section.
 func buildSectionTree(section *mq.Section, mode mq.TreeMode) *mq.TreeResult {
+	lines := 0
+	if section.End > 0 && section.End >= section.Start {
+		lines = section.End - section.Start + 1
+	}
+
 	result := &mq.TreeResult{
 		Path:  section.Heading.Text,
-		Lines: section.End - section.Start + 1,
+		Lines: lines,
 		Mode:  mode,
 	}
 
